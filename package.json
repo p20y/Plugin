@@ -1,0 +1,12 @@
+{
+  "name": "rinio-icons",
+  "version": "1.0.0",
+  "description": "Icon generator for Rinio Chrome extension",
+  "main": "generate-icons.js",
+  "scripts": {
+    "generate": "node generate-icons.js"
+  },
+  "dependencies": {
+    "sharp": "^0.32.1"
+  }
+} 

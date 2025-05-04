@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Rinio",
+  "version": "1.0",
+  "description": "Convert webpages to markdown and scrape Amazon product details",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "clipboardWrite",
+    "downloads",
+    "storage"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+} 
