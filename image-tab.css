@@ -1,0 +1,71 @@
+body {
+  width: 300px;
+  padding: 10px;
+  font-family: Arial, sans-serif;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+button {
+  padding: 8px 12px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+
+button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+#status {
+  margin-top: 10px;
+  padding: 8px;
+  border-radius: 4px;
+  display: none;
+}
+
+.success {
+  background-color: #dff0d8;
+  color: #3c763d;
+  display: block;
+}
+
+.error {
+  background-color: #f2dede;
+  color: #a94442;
+  display: block;
+}
+
+.amazon-btn {
+  background-color: #FF9900;
+}
+
+.amazon-btn:hover {
+  background-color: #e68a00;
+}
+
+.custom-image-container {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.custom-image-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-family: inherit;
+} 

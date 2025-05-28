@@ -8,6 +8,21 @@ document.addEventListener('DOMContentLoaded', function() {
   let markdownContent = '';
   let isPromptEditable = true;
 
+  // Tab switching functionality
+  const tabs = document.querySelectorAll('.tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      // Remove active class from all tabs and contents
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      // Add active class to clicked tab and corresponding content
+      tab.classList.add('active');
+      const tabId = tab.getAttribute('data-tab') + '-tab';
+      document.getElementById(tabId).classList.add('active');
+    });
+  });
+
   // Load saved prompt on popup open
   chrome.storage.local.get(['savedPrompt'], function(result) {
     if (result.savedPrompt) {
@@ -130,116 +145,71 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
+// Function to convert page content to markdown
 function convertToMarkdown(prompt) {
-  // List of selectors to exclude
   const excludeSelectors = [
     'script',
     'style',
     'noscript',
     'iframe',
-    'meta',
-    'link',
-    '[class*="ad"]',
-    '[class*="Ad"]',
-    '[class*="advertisement"]',
-    '[id*="ad-"]',
-    '[id*="Ad"]',
-    '[class*="social"]',
-    '[class*="share"]',
-    '[class*="popup"]',
-    '[class*="modal"]',
-    '[class*="cookie"]',
-    '[class*="newsletter"]',
-    '[class*="sidebar"]',
-    '[class*="related"]',
-    '[class*="recommended"]',
-    '[class*="promotion"]',
-    '[class*="sponsored"]',
     'nav',
     'footer',
-    'header:not(:first-child)',
-    '.navigation',
-    '.menu',
-    '.comments',
-    '.comment-section',
-    '#comments',
+    'header',
+    '.ad',
     '.advertisement',
-    '.social-share',
-    '.share-buttons',
-    '.newsletter-signup',
+    '.banner',
     '.cookie-notice',
     '.popup',
-    '.modal'
+    '.modal',
+    '.sidebar',
+    '.menu',
+    '.navigation',
+    '.social-share',
+    '.comments',
+    '.related-posts'
   ];
 
   function getMarkdownForElement(element) {
-    if (!element) return '';
-
-    // Skip excluded elements
-    if (excludeSelectors.some(selector => {
-      try {
-        return element.matches(selector);
-      } catch (e) {
-        return false;
-      }
-    })) {
-      return '';
+    if (element.tagName === 'H1') {
+      return `# ${element.textContent.trim()}\n\n`;
     }
-
-    // Handle different types of elements
-    if (element.tagName === 'H1') return `# ${element.textContent.trim()}\n\n`;
-    if (element.tagName === 'H2') return `## ${element.textContent.trim()}\n\n`;
-    if (element.tagName === 'H3') return `### ${element.textContent.trim()}\n\n`;
-    if (element.tagName === 'H4') return `#### ${element.textContent.trim()}\n\n`;
-    if (element.tagName === 'H5') return `##### ${element.textContent.trim()}\n\n`;
-    if (element.tagName === 'H6') return `###### ${element.textContent.trim()}\n\n`;
-
+    if (element.tagName === 'H2') {
+      return `## ${element.textContent.trim()}\n\n`;
+    }
+    if (element.tagName === 'H3') {
+      return `### ${element.textContent.trim()}\n\n`;
+    }
+    if (element.tagName === 'H4') {
+      return `#### ${element.textContent.trim()}\n\n`;
+    }
+    if (element.tagName === 'H5') {
+      return `##### ${element.textContent.trim()}\n\n`;
+    }
+    if (element.tagName === 'H6') {
+      return `###### ${element.textContent.trim()}\n\n`;
+    }
     if (element.tagName === 'P') {
       const text = element.textContent.trim();
       return text ? `${text}\n\n` : '';
     }
-
     if (element.tagName === 'A') {
       const text = element.textContent.trim();
       const href = element.getAttribute('href');
-      // Skip internal links, javascript links, and ad links
-      if (!href || href.startsWith('#') || 
-          href.startsWith('javascript:') || 
-          href.includes('/ads/') ||
-          href.includes('/advertisement/')) {
-        return text;
-      }
-      return href ? `[${text}](${href})` : text;
+      return text && href ? `[${text}](${href})` : text;
     }
-
     if (element.tagName === 'IMG') {
-      // Skip ad images and tracking pixels
-      if (element.width <= 1 || element.height <= 1) return '';
-      if (element.src && (
-        element.src.includes('/ads/') ||
-        element.src.includes('/advertisement/') ||
-        element.src.includes('/tracking/') ||
-        element.src.includes('/pixel/')
-      )) return '';
-
       const alt = element.getAttribute('alt') || '';
       const src = element.getAttribute('src');
-      if (!src) return '';
-      // Handle relative URLs
-      const fullSrc = src.startsWith('http') ? src : new URL(src, window.location.href).href;
-      return `![${alt}](${fullSrc})\n\n`;
+      return src ? `![${alt}](${src})` : '';
     }
-
     if (element.tagName === 'UL' || element.tagName === 'OL') {
       let items = '';
-      const listItems = element.querySelectorAll('li');
-      listItems.forEach((li, index) => {
-        const prefix = element.tagName === 'OL' ? `${index + 1}.` : '-';
+      const prefix = element.tagName === 'UL' ? '- ' : '1. ';
+      element.querySelectorAll('li').forEach(li => {
         items += `${prefix} ${li.textContent.trim()}\n`;
       });
       return items ? `${items}\n` : '';
     }
-
     if (element.tagName === 'TABLE') {
       let markdown = '\n';
       const rows = element.querySelectorAll('tr');
@@ -260,17 +230,14 @@ function convertToMarkdown(prompt) {
       });
       return `${markdown}\n`;
     }
-
     if (element.tagName === 'BLOCKQUOTE') {
       const text = element.textContent.trim();
       return text ? `> ${text}\n\n` : '';
     }
-
     if (element.tagName === 'CODE') {
       const text = element.textContent.trim();
       return text ? `\`${text}\`` : '';
     }
-
     if (element.tagName === 'PRE') {
       const text = element.textContent.trim();
       return text ? `\`\`\`\n${text}\n\`\`\`\n\n` : '';
@@ -347,6 +314,7 @@ function convertToMarkdown(prompt) {
   return markdown;
 }
 
+// Function to scrape Amazon product details
 function scrapeAmazonProduct(prompt) {
   const defaultPrompt = `Extract the following fields from this Amazon product listing:
 
@@ -439,4 +407,4 @@ Here's the Amazon product listing text:`;
     .join(',');
 
   return finalPrompt + '\n\n' + csvRow;
-} 
+}
