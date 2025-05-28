@@ -107,39 +107,44 @@ function extractAmazonImages() {
     throw new Error('Please navigate to an Amazon product page');
   }
 
-  // Get all product images
+  // Try immersive view first
+  const immersiveThumbs = document.querySelectorAll('#ivThumbs .ivThumbImage');
   const imageLinks = new Set();
-  
-  // Main product image
-  const mainImage = document.querySelector('#landingImage');
-  if (mainImage && mainImage.src) {
-    imageLinks.add(mainImage.src);
+
+  immersiveThumbs.forEach(div => {
+    const bg = div.style.background;
+    // Extract the URL from background: url("...")
+    const match = bg.match(/url\(["']?(.*?)["']?\)/);
+    if (match && match[1]) {
+      // Convert to full-size if needed
+      const url = match[1].replace(/\._[^.]+_\./, '.');
+      imageLinks.add(url);
+    }
+  });
+
+  // Fallback: main image block
+  if (imageLinks.size === 0) {
+    // Try to find the main image container
+    const mainImageContainer =
+      document.querySelector('#main-image-container') ||
+      document.querySelector('#imageBlock') ||
+      document.querySelector('#imgTagWrapperId') ||
+      document.querySelector('.imageBlock');
+    if (mainImageContainer) {
+      const images = mainImageContainer.querySelectorAll('img');
+      images.forEach(img => {
+        if (img.src) {
+          const fullSizeUrl = img.src.replace(/\._[^.]+_\./, '.');
+          imageLinks.add(fullSizeUrl);
+        }
+      });
+    }
   }
 
-  // Thumbnail images
-  const thumbnails = document.querySelectorAll('#imageThumbs img, #imageBlock img');
-  thumbnails.forEach(img => {
-    if (img.src) {
-      // Convert thumbnail URL to full-size image URL
-      const fullSizeUrl = img.src.replace(/\._[^.]+_\./, '.');
-      imageLinks.add(fullSizeUrl);
-    }
-  });
-
-  // Additional images from the image gallery
-  const galleryImages = document.querySelectorAll('#imageBlock img, #imageGallery img');
-  galleryImages.forEach(img => {
-    if (img.src) {
-      const fullSizeUrl = img.src.replace(/\._[^.]+_\./, '.');
-      imageLinks.add(fullSizeUrl);
-    }
-  });
-
-  // Convert Set to Array and filter out any invalid URLs
-  return Array.from(imageLinks).filter(url => 
-    url && 
-    url.startsWith('http') && 
-    !url.includes('sprite') && 
+  return Array.from(imageLinks).filter(url =>
+    url &&
+    url.startsWith('http') &&
+    !url.includes('sprite') &&
     !url.includes('spinner')
   );
 }
