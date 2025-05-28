@@ -1,9 +1,36 @@
 document.addEventListener('DOMContentLoaded', function() {
   const amazonImagesBtn = document.getElementById('amazonImagesBtn');
   const replaceImageBtn = document.getElementById('replaceImageBtn');
+  const productUrl = document.getElementById('productUrl');
   const productDetailUrl = document.getElementById('productDetailUrl');
   const rankInput = document.getElementById('rankInput');
   const statusDiv = document.getElementById('status');
+
+  // Load saved values on popup open
+  chrome.storage.local.get(['productUrl', 'productDetailUrl', 'rank'], function(result) {
+    if (result.productUrl) {
+      productUrl.value = result.productUrl;
+    }
+    if (result.productDetailUrl) {
+      productDetailUrl.value = result.productDetailUrl;
+    }
+    if (result.rank) {
+      rankInput.value = result.rank;
+    }
+  });
+
+  // Save values when they change
+  productUrl.addEventListener('change', () => {
+    chrome.storage.local.set({ productUrl: productUrl.value });
+  });
+
+  productDetailUrl.addEventListener('change', () => {
+    chrome.storage.local.set({ productDetailUrl: productDetailUrl.value });
+  });
+
+  rankInput.addEventListener('change', () => {
+    chrome.storage.local.set({ rank: rankInput.value });
+  });
 
   amazonImagesBtn.addEventListener('click', async () => {
     try {
@@ -30,11 +57,11 @@ document.addEventListener('DOMContentLoaded', function() {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       
-      const detailUrl = productDetailUrl.value.trim();
+      const imageUrl = productDetailUrl.value.trim();
       const rank = parseInt(rankInput.value);
 
-      if (!detailUrl) {
-        showStatus('Please enter a product detail page URL', 'error');
+      if (!imageUrl) {
+        showStatus('Please enter an image URL', 'error');
         return;
       }
 
@@ -43,10 +70,18 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
 
-      // Use the URL directly as the image URL
+      // If product URL is provided, fetch the title
+      let title = 'Product Title';
+      if (productUrl.value.trim()) {
+        const productDetails = await fetchProductDetails(productUrl.value.trim());
+        if (productDetails && productDetails.title) {
+          title = productDetails.title;
+        }
+      }
+
       const productDetails = {
-        title: 'Product Title', // We can keep this or remove it if not needed
-        imageUrl: detailUrl
+        title: title,
+        imageUrl: imageUrl
       };
 
       // Then, replace the product in search results
@@ -77,22 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
       const title = doc.querySelector('#productTitle')?.textContent.trim() || '';
       console.log('Found title:', title);
       
-      // Extract main image URL
-      const mainImage = doc.querySelector('#landingImage');
-      let imageUrl = '';
-      if (mainImage) {
-        // Get the highest quality image URL
-        imageUrl = mainImage.src.replace(/\._[^.]+_\./, '.');
-        console.log('Found image URL:', imageUrl);
-      } else {
-        console.log('No main image found');
-      }
-
-      if (!imageUrl) {
-        throw new Error('Could not find product image');
-      }
-
-      return { title, imageUrl };
+      return { title };
     } catch (error) {
       console.error('Error fetching product details:', error);
       return null;
