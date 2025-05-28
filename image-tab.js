@@ -233,37 +233,8 @@ function replaceProductInSearch(productDetails, rank) {
   if (titleElement) {
     // Store the original title for reference
     titleElement.dataset.originalTitle = titleElement.textContent;
-    
-    // Create a new text node with the prefixed title
-    const newTitle = "Viva Earth " + productDetails.title;
-    
-    // Update the title
-    const linkElement = titleElement.closest('a');
-    if (linkElement) {
-      // Preserve all child elements and attributes
-      const originalHTML = linkElement.innerHTML;
-      const originalClasses = linkElement.className;
-      const originalAttributes = Array.from(linkElement.attributes)
-        .filter(attr => attr.name !== 'class')
-        .reduce((acc, attr) => {
-          acc[attr.name] = attr.value;
-          return acc;
-        }, {});
-
-      // Create a new link with the same structure
-      const newLink = document.createElement('a');
-      newLink.className = originalClasses;
-      Object.entries(originalAttributes).forEach(([name, value]) => {
-        newLink.setAttribute(name, value);
-      });
-      newLink.textContent = newTitle;
-
-      // Replace the old link with the new one
-      linkElement.parentNode.replaceChild(newLink, linkElement);
-    } else {
-      // If not in a link, just update the text content
-      titleElement.textContent = newTitle;
-    }
+    // Just update the text content, preserving all CSS and structure
+    titleElement.textContent = "Viva Earth " + productDetails.title;
   } else {
     console.warn('Could not find title element to replace');
   }
