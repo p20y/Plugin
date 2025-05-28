@@ -43,11 +43,11 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
 
-      // First, fetch product details from the detail page
-      const productDetails = await fetchProductDetails(detailUrl);
-      if (!productDetails) {
-        throw new Error('Failed to fetch product details');
-      }
+      // Use the URL directly as the image URL
+      const productDetails = {
+        title: 'Product Title', // We can keep this or remove it if not needed
+        imageUrl: detailUrl
+      };
 
       // Then, replace the product in search results
       const result = await chrome.scripting.executeScript({
@@ -75,6 +75,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       // Extract product title
       const title = doc.querySelector('#productTitle')?.textContent.trim() || '';
+      console.log('Found title:', title);
       
       // Extract main image URL
       const mainImage = doc.querySelector('#landingImage');
@@ -82,6 +83,13 @@ document.addEventListener('DOMContentLoaded', function() {
       if (mainImage) {
         // Get the highest quality image URL
         imageUrl = mainImage.src.replace(/\._[^.]+_\./, '.');
+        console.log('Found image URL:', imageUrl);
+      } else {
+        console.log('No main image found');
+      }
+
+      if (!imageUrl) {
+        throw new Error('Could not find product image');
       }
 
       return { title, imageUrl };
@@ -155,10 +163,15 @@ function replaceProductInSearch(productDetails, rank) {
     throw new Error('Please navigate to an Amazon search results page');
   }
 
+  // Validate product details
+  if (!productDetails || !productDetails.imageUrl) {
+    throw new Error('Invalid product details: missing image URL');
+  }
+
   // Find all product containers
   const productContainers = document.querySelectorAll('.s-result-item[data-component-type="s-search-result"]');
   if (productContainers.length < rank) {
-    throw new Error(`Not enough products found on the page (found ${productContainers.length}, requested rank ${rank})`);
+    throw new Error(`Rank ${rank} is out of range. Only ${productContainers.length} products found.`);
   }
 
   // Get the target product container (rank is 1-based)
@@ -169,9 +182,17 @@ function replaceProductInSearch(productDetails, rank) {
 
   // Replace the image
   const productImage = targetContainer.querySelector('.s-image');
-  if (productImage) {
-    productImage.src = productDetails.imageUrl;
-    productImage.srcset = ''; // Clear srcset to prevent responsive image loading
+  if (!productImage) {
+    throw new Error('Could not find product image element');
+  }
+
+  try {
+    // Set both src and srcset attributes
+    productImage.setAttribute('src', productDetails.imageUrl);
+    productImage.setAttribute('srcset', productDetails.imageUrl);
+  } catch (error) {
+    console.error('Error replacing image:', error);
+    throw new Error('Failed to replace image attributes');
   }
 
   // Replace the title - try multiple selectors to ensure we find the title element
@@ -196,7 +217,7 @@ function replaceProductInSearch(productDetails, rank) {
     // Create a new text node with the prefixed title
     const newTitle = "Viva Earth " + productDetails.title;
     
-    // If the title is in a link, update the link's text content
+    // Update the title
     const linkElement = titleElement.closest('a');
     if (linkElement) {
       // Preserve all child elements and attributes
