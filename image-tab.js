@@ -43,13 +43,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
       if (result && result[0] && result[0].result) {
         const imageLinks = result[0].result;
+        if (imageLinks.length === 0) {
+          showStatus('No product images found. Make sure you are on an Amazon product detail page.', 'error');
+          return;
+        }
+        
         await navigator.clipboard.writeText(imageLinks.join('\n'));
-        showStatus('Product image links copied to clipboard!', 'success');
+        showStatus(`Successfully copied ${imageLinks.length} product image links to clipboard!`, 'success');
+        
+        // Log the found images for debugging
+        console.log('Found images:', imageLinks);
       } else {
         throw new Error('Failed to extract product images');
       }
     } catch (error) {
       showStatus('Error: ' + error.message, 'error');
+      console.error('Error extracting images:', error);
     }
   });
 
@@ -135,46 +144,97 @@ function extractAmazonImages() {
     throw new Error('Please navigate to an Amazon product page');
   }
 
-  // Try immersive view first
-  const immersiveThumbs = document.querySelectorAll('#ivThumbs .ivThumbImage');
   const imageLinks = new Set();
 
-  immersiveThumbs.forEach(div => {
-    const bg = div.style.background;
-    // Extract the URL from background: url("...")
-    const match = bg.match(/url\(["']?(.*?)["']?\)/);
-    if (match && match[1]) {
-      // Convert to full-size if needed
-      const url = match[1].replace(/\._[^.]+_\./, '.');
-      imageLinks.add(url);
-    }
-  });
+  // Focus on the main displayed product images in the image block
+  const imageBlock = document.querySelector('#imageBlock');
+  if (!imageBlock) {
+    throw new Error('Product image block not found');
+  }
 
-  // Fallback: main image block
-  if (imageLinks.size === 0) {
-    // Try to find the main image container
-    const mainImageContainer =
-      document.querySelector('#main-image-container') ||
-      document.querySelector('#imageBlock') ||
-      document.querySelector('#imgTagWrapperId') ||
-      document.querySelector('.imageBlock');
-    if (mainImageContainer) {
-      const images = mainImageContainer.querySelectorAll('img');
-      images.forEach(img => {
-        if (img.src) {
-          const fullSizeUrl = img.src.replace(/\._[^.]+_\./, '.');
-          imageLinks.add(fullSizeUrl);
+  // Method 1: Get the main displayed images from the main image container
+  const mainImageContainer = imageBlock.querySelector('#main-image-container');
+  if (mainImageContainer) {
+    // Get all visible main images (the ones that are actually displayed)
+    const mainImages = mainImageContainer.querySelectorAll('.image.item img, #landingImage');
+    mainImages.forEach(img => {
+      if (img.src && img.offsetParent !== null) { // Check if image is visible
+        let fullSizeUrl = img.src;
+        
+        // Get the highest quality version from data-old-hires if available
+        const oldHires = img.getAttribute('data-old-hires');
+        if (oldHires) {
+          fullSizeUrl = oldHires;
         }
-      });
+        
+        imageLinks.add(fullSizeUrl);
+      }
+    });
+  }
+
+  // Method 2: Get images from the thumbnail gallery (these represent the actual product images)
+  const altImages = imageBlock.querySelector('#altImages');
+  if (altImages) {
+    const thumbnailImages = altImages.querySelectorAll('.imageThumbnail img');
+    thumbnailImages.forEach(img => {
+      if (img.src) {
+        // Convert thumbnail URLs to full-size versions
+        let fullSizeUrl = img.src;
+        
+        // Remove the _SS40_ suffix to get the original image
+        if (fullSizeUrl.includes('_SS40_')) {
+          fullSizeUrl = fullSizeUrl.replace('_SS40_', '');
+        }
+        
+        imageLinks.add(fullSizeUrl);
+      }
+    });
+  }
+
+  // Method 3: Get the dynamic image data from the main image (contains all available sizes)
+  const landingImage = imageBlock.querySelector('#landingImage');
+  if (landingImage) {
+    const dynamicImageData = landingImage.getAttribute('data-a-dynamic-image');
+    if (dynamicImageData) {
+      try {
+        const imageData = JSON.parse(dynamicImageData);
+        // Get the highest resolution version (usually the last one in the object)
+        const urls = Object.keys(imageData);
+        if (urls.length > 0) {
+          // Sort by resolution and get the highest
+          const sortedUrls = urls.sort((a, b) => {
+            const aSize = imageData[a][0] || 0;
+            const bSize = imageData[b][0] || 0;
+            return bSize - aSize;
+          });
+          imageLinks.add(sortedUrls[0]); // Add the highest resolution version
+        }
+      } catch (e) {
+        // If JSON parsing fails, just use the src
+        if (landingImage.src) {
+          imageLinks.add(landingImage.src);
+        }
+      }
+    } else if (landingImage.src) {
+      // Fallback to src if no dynamic data
+      imageLinks.add(landingImage.src);
     }
   }
 
-  return Array.from(imageLinks).filter(url =>
+  // Convert Set to Array and filter
+  const filteredImages = Array.from(imageLinks).filter(url =>
     url &&
     url.startsWith('http') &&
     !url.includes('sprite') &&
-    !url.includes('spinner')
+    !url.includes('spinner') &&
+    !url.includes('transparent') &&
+    !url.includes('grey-pixel') &&
+    !url.includes('360_icon') &&
+    (url.includes('images-na.ssl-images-amazon.com') || url.includes('m.media-amazon.com'))
   );
+
+  // Remove duplicates and return unique product images
+  return [...new Set(filteredImages)];
 }
 
 function replaceProductInSearch(productDetails, rank) {
